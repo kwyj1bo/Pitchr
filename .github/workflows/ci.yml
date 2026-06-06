@@ -80,6 +80,9 @@ jobs:
           sudo apt update
           sudo apt-get install mariadb-client
 
+      - name: Install PortAudio
+        run: sudo apt-get install -y libportaudio2
+
       - name: Setup
         run: |
           pip install frappe-bench
