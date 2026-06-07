@@ -37,4 +37,3 @@ def index_song(song_name: str) -> None:
 	contour = normalize(pitch_sequence)
 	doc.melody_contour = json.dumps(contour.tolist())
 	doc.save()
-	frappe.db.commit()
