@@ -1,6 +1,5 @@
 import numpy as np
 
-
 SAMPLE_RATE = 22050
 MIN_FREQ = 80
 MAX_FREQ = 1000
@@ -11,7 +10,7 @@ def difference(audio: np.ndarray) -> np.ndarray:
 	tau_max = len(audio) // 2
 	diff = np.zeros(tau_max)
 	for tau in range(1, tau_max):
-		diff[tau] = np.sum((audio[: tau_max - tau] - audio[tau : tau_max]) ** 2)
+		diff[tau] = np.sum((audio[: tau_max - tau] - audio[tau:tau_max]) ** 2)
 	return diff
 
 
