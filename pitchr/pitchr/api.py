@@ -14,7 +14,7 @@ MATCH_THRESHOLD = 50.0
 SAMPLE_RATE = 22050
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
 def recognize(audio_b64: str) -> dict:
 	audio_bytes = base64.b64decode(audio_b64)
 	audio = np.frombuffer(audio_bytes, dtype=np.float32)

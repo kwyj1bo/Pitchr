@@ -1,0 +1,29 @@
+<div class="container my-5">
+	<div class="text-center mb-5">
+		<h1 class="display-4">🎵 Pitchr</h1>
+		<p class="lead text-muted">Hum a song. We'll name it.</p>
+	</div>
+
+	<div class="row justify-content-center">
+		<div class="col-md-6">
+			<div class="card shadow-sm">
+				<div class="card-body text-center p-5">
+					<button id="record-btn" class="btn btn-primary btn-lg rounded-circle mb-4" style="width:100px;height:100px;font-size:2rem;">
+						🎤
+					</button>
+					<p id="status-text" class="text-muted">Press to start humming</p>
+					<div id="result" class="mt-4" style="display:none;">
+						<hr>
+						<h4 id="song-name" class="text-success fw-bold"></h4>
+						<p id="score-text" class="text-muted small"></p>
+					</div>
+					<div id="no-match" class="mt-4" style="display:none;">
+						<hr>
+						<p class="text-warning">No match found. Try humming more clearly!</p>
+					</div>
+					<div id="error-msg" class="mt-4 text-danger" style="display:none;"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
