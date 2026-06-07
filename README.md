@@ -1,40 +1,63 @@
-### Pitchr
+# Pitchr 🎵
 
-Hum to find a song
+Hum a song. We'll name it.
 
-### Installation
+## How it works
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+1. User hums a melody on the portal page
+2. Audio is captured and sent to the backend
+3. YIN pitch detection extracts the pitch sequence
+4. Melody contour is normalized (key-invariant)
+5. DTW matching finds the closest song in the database
+6. Result is returned to the user
+
+## Tech
+
+- **Pitch detection**: YIN algorithm (from scratch)
+- **Matching**: Dynamic Time Warping (from scratch)
+- **Framework**: Frappe
+- **No ML, no external fingerprinting libraries**
+
+## Modules
+
+| Module | Description |
+|--------|-------------|
+| Audio Capture | Records mic input via sounddevice |
+| YIN Pitch Detection | Extracts pitch sequence from audio |
+| Contour Normalization | Makes matching key-invariant |
+| DTW Matcher | Finds best matching song |
+| Song Indexer | Indexes songs into the database |
+| API Layer | Frappe whitelisted REST endpoints |
+| Portal Page | Frontend UI for humming |
+
+## Installation
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
+bench get-app https://github.com/kwyj1bo/Pitchr --branch develop
 bench install-app pitchr
 ```
 
-### Contributing
+## Usage
 
-This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
+Visit `/pitchr` on your Frappe site, press the mic button, and hum.
+
+## Contributing
+
+This app uses `pre-commit` for code formatting and linting. Install and enable it:
 
 ```bash
 cd apps/pitchr
 pre-commit install
 ```
 
-Pre-commit is configured to use the following tools for checking and formatting your code:
+Pre-commit is configured to use: ruff, eslint, prettier, pyupgrade.
 
-- ruff
-- eslint
-- prettier
-- pyupgrade
-### CI
+## CI
 
-This app can use GitHub Actions for CI. The following workflows are configured:
+- **CI**: Installs the app and runs unit tests on every push to `develop`
+- **Linters**: Runs Frappe Semgrep Rules and pip-audit on every pull request
 
-- CI: Installs this app and runs unit tests on every push to `develop` branch.
-- Linters: Runs [Frappe Semgrep Rules](https://github.com/frappe/semgrep-rules) and [pip-audit](https://pypi.org/project/pip-audit/) on every pull request.
+## License
 
-
-### License
-
-mit
+MIT
