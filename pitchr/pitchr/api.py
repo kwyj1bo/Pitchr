@@ -5,44 +5,39 @@ import frappe
 import numpy as np
 from frappe import _
 
-from pitchr.pitch.contour import normalize
-from pitchr.pitch.dtw import find_best_match
-from pitchr.pitch.yin import detect_pitch
-from pitchr.pitchr.song_indexer import extract_pitch_sequence
+from pitchr.pitch.pipeline import DEFAULT_MATCH_THRESHOLD, audio_to_contour, recognize_contour
 
-MATCH_THRESHOLD = 50.0
 SAMPLE_RATE = 22050
 
 
-@frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
-def recognize(audio_b64: str) -> dict:
-	audio_bytes = base64.b64decode(audio_b64)
-	audio = np.frombuffer(audio_bytes, dtype=np.float32)
-
-	pitch_sequence = extract_pitch_sequence(audio)
-	query_contour = normalize(pitch_sequence)
-
+def _load_song_contours() -> list[tuple[str, np.ndarray]]:
+	"""Load indexed song fingerprints from the database."""
 	songs = frappe.get_all("Song", fields=["song_name", "melody_contour"])
-
 	candidates = []
 	for song in songs:
 		if not song.get("melody_contour"):
 			continue
 		contour = np.array(json.loads(song["melody_contour"]), dtype=np.float32)
-		candidates.append((song["song_name"], contour))
+		if len(contour) >= 2:
+			candidates.append((song["song_name"], contour))
+	return candidates
 
-	if not candidates:
-		return {"matched": False, "song_name": None, "score": None}
 
-	best_name, best_score = find_best_match(query_contour, candidates)
+@frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
+def recognize(audio_b64: str) -> dict:
+	"""Recognize a hummed melody.
 
-	matched = best_score < MATCH_THRESHOLD
+	``audio_b64`` is base64-encoded raw mono float32 PCM at 22.05 kHz; the
+	browser decodes and resamples its recording before upload (see www/pitchr.js)
+	so the backend never has to depend on an audio codec.
+	"""
+	audio_bytes = base64.b64decode(audio_b64)
+	audio = np.frombuffer(audio_bytes, dtype=np.float32)
 
-	return {
-		"matched": matched,
-		"song_name": best_name if matched else None,
-		"score": round(best_score, 2),
-	}
+	query_contour = audio_to_contour(audio, SAMPLE_RATE)
+	candidates = _load_song_contours()
+
+	return recognize_contour(query_contour, candidates, threshold=DEFAULT_MATCH_THRESHOLD)
 
 
 @frappe.whitelist()
