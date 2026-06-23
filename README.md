@@ -47,7 +47,16 @@ python -m benchmark.run_benchmark --queries 4          # built-in 25-song corpus
 python -m benchmark.run_benchmark --midi-dir mids/     # scale to any MIDI library
 ```
 
-On the built-in corpus: **clean 100%**, **light 95%**, **realistic 71% Top-1 / 92% Top-3**.
+Accuracy (Top-1 / Top-3), no ML, melodic DTW only:
+
+| Corpus | clean | light | realistic | heavy |
+|--------|-------|-------|-----------|-------|
+| Built-in (25 songs) | 100% / 100% | 95% / 99% | 71% / 92% | 35% / 52% |
+| Nottingham (150 songs) | 93% / 99% | 87% / 95% | **77% / 89%** | 62% / 73% |
+
+The margin-based accept gate keeps the false-accept rate (a hummed song that
+is *not* in the database) to ≈3–13% depending on profile, versus 96% with a
+naive absolute-threshold gate.
 
 ## Installation
 

@@ -86,7 +86,15 @@ def _extract_melody_from_midi(path: str) -> list[tuple[int, float]]:
 	return notes
 
 
-def load_midi_corpus(directory: str, limit: int | None = None) -> list[Song]:
+def load_midi_corpus(
+	directory: str, limit: int | None = None, max_notes: int | None = 48
+) -> list[Song]:
+	"""Load songs from a MIDI directory.
+
+	``max_notes`` truncates each melody to its opening phrase, which keeps query
+	synthesis fast and reflects how QBH works in practice (people hum a short
+	hook, and only that hook needs to be indexed for matching).
+	"""
 	songs = []
 	paths = sorted(glob.glob(os.path.join(directory, "**", "*.mid"), recursive=True))
 	paths += sorted(glob.glob(os.path.join(directory, "**", "*.midi"), recursive=True))
@@ -97,6 +105,8 @@ def load_midi_corpus(directory: str, limit: int | None = None) -> list[Song]:
 			continue
 		if len(notes) < 6:
 			continue
+		if max_notes:
+			notes = notes[:max_notes]
 		contour = notes_to_reference_contour(notes).tolist()
 		if len(contour) < 4:
 			continue
