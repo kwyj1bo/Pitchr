@@ -24,10 +24,18 @@ def cumulative_mean_normalized_difference(diff: np.ndarray) -> np.ndarray:
 	return cmnd
 
 
-def absolute_threshold(cmnd: np.ndarray, threshold: float = THRESHOLD) -> int:
-	for tau in range(2, len(cmnd)):
+def absolute_threshold(
+	cmnd: np.ndarray,
+	threshold: float = THRESHOLD,
+	tau_min: int = 2,
+	tau_max: int | None = None,
+) -> int:
+	if tau_max is None or tau_max > len(cmnd):
+		tau_max = len(cmnd)
+	tau_min = max(tau_min, 2)
+	for tau in range(tau_min, tau_max):
 		if cmnd[tau] < threshold:
-			while tau + 1 < len(cmnd) and cmnd[tau + 1] < cmnd[tau]:
+			while tau + 1 < tau_max and cmnd[tau + 1] < cmnd[tau]:
 				tau += 1
 			return tau
 	return -1
@@ -45,7 +53,11 @@ def parabolic_interpolation(cmnd: np.ndarray, tau: int) -> float:
 def detect_pitch(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> float:
 	diff = difference(audio)
 	cmnd = cumulative_mean_normalized_difference(diff)
-	tau = absolute_threshold(cmnd)
+	# Restrict the lag search to the plausible vocal range so background noise
+	# and sub-harmonics cannot produce spurious very-low/high pitch estimates.
+	tau_min = max(int(sample_rate / MAX_FREQ), 2)
+	tau_max = min(int(sample_rate / MIN_FREQ) + 1, len(cmnd))
+	tau = absolute_threshold(cmnd, tau_min=tau_min, tau_max=tau_max)
 	if tau == -1:
 		return 0.0
 	refined_tau = parabolic_interpolation(cmnd, tau)
