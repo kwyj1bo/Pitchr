@@ -68,13 +68,21 @@ def _extract_melody_from_midi(path: str) -> list[tuple[int, float]]:
 		return []
 	events.sort()
 
-	# Flatten to a monophonic sequence in time order (highest note wins ties).
+	# Skyline melody: collapse notes sharing an onset (block chords) to the
+	# highest pitch, giving a monophonic top line suitable for QBH.
 	notes: list[tuple[int, float]] = []
-	for start, end, pitch in events:
+	i = 0
+	while i < len(events):
+		start = events[i][0]
+		group = [events[i]]
+		j = i + 1
+		while j < len(events) and events[j][0] == start:
+			group.append(events[j])
+			j += 1
+		_, end, pitch = max(group, key=lambda e: e[2])  # highest note of the chord
 		beats = max((end - start) / ticks_per_beat, 0.05)
-		if notes and start == events[0][0]:
-			pass
 		notes.append((pitch, round(beats, 3)))
+		i = j
 	return notes
 
 

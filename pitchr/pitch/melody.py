@@ -33,21 +33,45 @@ def hz_to_semitones(pitch_hz: np.ndarray) -> np.ndarray:
 	return out
 
 
+def median_smooth(semis: np.ndarray, window: int = 5) -> np.ndarray:
+	"""NaN-aware median filter over a semitone track.
+
+	Removes isolated single-frame pitch errors (e.g. octave jumps) without
+	bridging across silence: unvoiced frames stay NaN.  Implemented in pure
+	numpy so the Frappe app needs no extra dependency.
+	"""
+	if window <= 1 or len(semis) == 0:
+		return semis
+	half = window // 2
+	out = np.copy(semis)
+	for i in range(len(semis)):
+		if np.isnan(semis[i]):
+			continue
+		lo, hi = max(0, i - half), min(len(semis), i + half + 1)
+		win = semis[lo:hi]
+		win = win[~np.isnan(win)]
+		if len(win):
+			out[i] = np.median(win)
+	return out
+
+
 def segment_notes(
 	pitch_hz: np.ndarray,
 	min_note_frames: int = 3,
-	merge_tolerance: float = 0.6,
+	merge_tolerance: float = 1.0,
+	smooth_window: int = 3,
 ) -> np.ndarray:
 	"""Segment a frame-level pitch track into note-level semitone values.
 
-	Consecutive voiced frames whose pitch stays within ``merge_tolerance``
-	semitones of the running note median are merged into a single note.  Notes
-	shorter than ``min_note_frames`` are discarded as noise.  Silence
-	(unvoiced frames) ends the current note.
+	The track is first median-smoothed to drop isolated octave errors.  Then
+	consecutive voiced frames whose pitch stays within ``merge_tolerance``
+	semitones of the running note median are merged into a single note; notes
+	shorter than ``min_note_frames`` are discarded as noise; silence (unvoiced
+	frames) ends the current note.
 
 	Returns a 1-D array of note pitches in semitones (relative to A4).
 	"""
-	semis = hz_to_semitones(pitch_hz)
+	semis = median_smooth(hz_to_semitones(pitch_hz), smooth_window)
 	notes: list[float] = []
 	current: list[float] = []
 
@@ -89,8 +113,9 @@ def notes_to_intervals(notes: np.ndarray) -> np.ndarray:
 def pitch_track_to_intervals(
 	pitch_hz: np.ndarray,
 	min_note_frames: int = 3,
-	merge_tolerance: float = 0.6,
+	merge_tolerance: float = 1.0,
+	smooth_window: int = 3,
 ) -> np.ndarray:
 	"""Full convenience pipeline: frame pitch track -> key-invariant intervals."""
-	notes = segment_notes(pitch_hz, min_note_frames, merge_tolerance)
+	notes = segment_notes(pitch_hz, min_note_frames, merge_tolerance, smooth_window)
 	return notes_to_intervals(notes)

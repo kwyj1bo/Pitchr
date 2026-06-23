@@ -1,0 +1,5 @@
+# Dependencies for the standalone benchmark + tests (no Frappe bench needed).
+numpy
+scipy
+soundfile
+mido
