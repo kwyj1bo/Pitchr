@@ -11,10 +11,18 @@ from pitchr.pitchr.song_indexer import extract_pitch_sequence, load_audio
 
 class TestSongIndexer(FrappeTestCase):
 	def _create_temp_audio(
-		self, frequency: float = 440.0, duration: float = 1.0, sample_rate: int = 22050
+		self, freqs=(440.0, 494.0, 523.0, 587.0), note_dur: float = 0.5, sample_rate: int = 22050
 	) -> str:
-		t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-		audio = np.sin(2 * np.pi * frequency * t).astype(np.float32)
+		chunks = []
+		for f in freqs:
+			t = np.linspace(0, note_dur, int(sample_rate * note_dur), endpoint=False)
+			env = np.ones_like(t)
+			a = int(0.02 * sample_rate)
+			env[:a] = np.linspace(0, 1, a)
+			env[-a:] = np.linspace(1, 0, a)
+			chunks.append((np.sin(2 * np.pi * f * t) * env).astype(np.float32))
+			chunks.append(np.zeros(int(sample_rate * 0.05), dtype=np.float32))
+		audio = np.concatenate(chunks)
 		tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
 		sf.write(tmp.name, audio, sample_rate)
 		return tmp.name
@@ -52,4 +60,5 @@ class TestSongIndexer(FrappeTestCase):
 
 		self.assertIsNotNone(mock_doc.melody_contour)
 		contour = json.loads(mock_doc.melody_contour)
-		self.assertEqual(len(contour), 100)
+		# Note-level interval contour: a 4-note melody yields 3 intervals.
+		self.assertGreaterEqual(len(contour), 2)

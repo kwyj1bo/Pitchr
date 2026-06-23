@@ -9,11 +9,22 @@ from frappe.tests.utils import FrappeTestCase
 
 
 class TestAPI(FrappeTestCase):
-	def _create_audio_b64(self, frequency: float = 440.0, duration: float = 3.0) -> str:
-		sample_rate = 22050
-		t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-		audio = np.sin(2 * np.pi * frequency * t).astype(np.float32)
-		return base64.b64encode(audio.tobytes()).decode("utf-8")
+	def _melody_audio(self, freqs=(440.0, 494.0, 523.0, 587.0), note_dur=0.5) -> np.ndarray:
+		"""A short multi-note melody (recognition needs >= 2 distinct notes)."""
+		sr = 22050
+		chunks = []
+		for f in freqs:
+			t = np.linspace(0, note_dur, int(sr * note_dur), endpoint=False)
+			env = np.ones_like(t)
+			a = int(0.02 * sr)
+			env[:a] = np.linspace(0, 1, a)
+			env[-a:] = np.linspace(1, 0, a)
+			chunks.append((np.sin(2 * np.pi * f * t) * env).astype(np.float32))
+			chunks.append(np.zeros(int(sr * 0.05), dtype=np.float32))  # gap between notes
+		return np.concatenate(chunks)
+
+	def _create_audio_b64(self, freqs=(440.0, 494.0, 523.0, 587.0)) -> str:
+		return base64.b64encode(self._melody_audio(freqs).tobytes()).decode("utf-8")
 
 	def test_recognize_no_songs_returns_unmatched(self):
 		audio_b64 = self._create_audio_b64()
@@ -25,18 +36,16 @@ class TestAPI(FrappeTestCase):
 		self.assertIsNone(result["song_name"])
 
 	def test_recognize_matching_song(self):
-		audio_b64 = self._create_audio_b64(440.0)
+		# Same melody for query and indexed song -> should match.
+		audio_b64 = self._create_audio_b64()
 
-		t = np.linspace(0, 3.0, int(22050 * 3.0), endpoint=False)
-		song_audio = np.sin(2 * np.pi * 440.0 * t).astype(np.float32)
+		from pitchr.pitch.pipeline import audio_to_contour
 
-		from pitchr.pitch.contour import normalize
-		from pitchr.pitchr.song_indexer import extract_pitch_sequence
-
-		song_contour = normalize(extract_pitch_sequence(song_audio))
+		song_contour = audio_to_contour(self._melody_audio())
 
 		mock_songs = [
 			{"song_name": "Test Song", "melody_contour": json.dumps(song_contour.tolist())},
+			{"song_name": "Other Song", "melody_contour": json.dumps([7.0, -7.0, 5.0, -5.0])},
 		]
 
 		with patch("pitchr.pitchr.api.frappe.get_all", return_value=mock_songs):

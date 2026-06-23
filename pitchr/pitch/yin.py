@@ -7,11 +7,36 @@ THRESHOLD = 0.15
 
 
 def difference(audio: np.ndarray) -> np.ndarray:
-	tau_max = len(audio) // 2
-	diff = np.zeros(tau_max)
-	for tau in range(1, tau_max):
-		diff[tau] = np.sum((audio[: tau_max - tau] - audio[tau:tau_max]) ** 2)
-	return diff
+	r"""YIN difference function.
+
+	d(\tau) = \sum_{j=0}^{M-\tau-1} (x_j - x_{j+\tau})^2,  M = len(audio)//2
+
+	Expanded as A(\tau) + B(\tau) - 2 C(\tau), where the energy terms A/B come
+	from prefix sums and the correlation term C is the autocorrelation computed
+	with the FFT.  This is mathematically identical to the naive O(M^2) double
+	loop but runs in O(M log M), which makes indexing and recognition fast
+	enough for long recordings and large corpora.
+	"""
+	m = len(audio) // 2
+	diff = np.zeros(m)
+	if m < 2:
+		return diff
+
+	x = np.asarray(audio[:m], dtype=np.float64)
+	sq = x * x
+	prefix = np.cumsum(sq)          # prefix[i] = sum_{0..i} x^2
+	total = prefix[-1]
+
+	# Autocorrelation via FFT: corr[tau] = sum_j x[j] x[j+tau].
+	n_fft = 1 << (2 * m - 1).bit_length()
+	spectrum = np.fft.rfft(x, n_fft)
+	corr = np.fft.irfft(spectrum * np.conj(spectrum), n_fft)[:m]
+
+	tau = np.arange(1, m)
+	a = prefix[m - tau - 1]          # sum of first (m - tau) squared samples
+	b = total - prefix[tau - 1]      # sum of squared samples from tau .. m-1
+	diff[1:] = a + b - 2.0 * corr[1:]
+	return np.maximum(diff, 0.0)     # guard tiny negatives from FFT round-off
 
 
 def cumulative_mean_normalized_difference(diff: np.ndarray) -> np.ndarray:
