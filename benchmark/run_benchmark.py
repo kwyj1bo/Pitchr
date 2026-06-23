@@ -29,6 +29,25 @@ def _build_db(songs):
 	return [(s.name, np.array(s.contour, dtype=np.float32)) for s in songs if len(s.contour) >= 2]
 
 
+def evaluate_rejection(songs, profile, threshold=DEFAULT_MATCH_THRESHOLD, queries_per_song=1):
+	"""False-accept rate: hum a song that is NOT in the database (leave-one-out).
+
+	A robust system should *reject* (best score above threshold) when the hummed
+	song is absent.  Returns the fraction wrongly accepted.
+	"""
+	db = _build_db(songs)
+	false_accepts = total = 0
+	for song in songs:
+		held_out = [(n, c) for n, c in db if n != song.name]
+		for q in range(queries_per_song):
+			audio = synth.synthesize(song.notes, profile, seed=1000 * q + 7)
+			ranked = rank_matches(audio_to_contour(audio), held_out)
+			total += 1
+			if ranked and ranked[0][1] <= threshold:
+				false_accepts += 1
+	return false_accepts / total if total else 0.0
+
+
 def evaluate(songs, profiles, queries_per_song=3, threshold=DEFAULT_MATCH_THRESHOLD, verbose=False):
 	db = _build_db(songs)
 	names = {n for n, _ in db}
@@ -92,6 +111,7 @@ def main():
 	ap.add_argument("--queries", type=int, default=3, help="queries synthesized per song")
 	ap.add_argument("--threshold", type=float, default=DEFAULT_MATCH_THRESHOLD)
 	ap.add_argument("--verbose", action="store_true")
+	ap.add_argument("--negatives", action="store_true", help="also report false-accept rate (leave-one-out)")
 	args = ap.parse_args()
 
 	if args.midi_dir:
@@ -105,6 +125,12 @@ def main():
 		threshold=args.threshold, verbose=args.verbose,
 	)
 	print_report(results, len(songs))
+
+	if args.negatives:
+		print("\n  False-accept rate (hummed song absent from DB, leave-one-out):")
+		for profile in synth.PROFILES:
+			fa = evaluate_rejection(songs, profile, threshold=args.threshold)
+			print(f"    {profile.name:<12}{fa:>7.1%}")
 
 
 if __name__ == "__main__":

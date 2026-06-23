@@ -5,16 +5,17 @@ Hum a song. We'll name it.
 ## How it works
 
 1. User hums a melody on the portal page
-2. Audio is captured and sent to the backend
-3. YIN pitch detection extracts the pitch sequence
-4. Melody contour is normalized (key-invariant)
-5. DTW matching finds the closest song in the database
-6. Result is returned to the user
+2. The browser decodes the recording to raw mono float32 PCM @ 22.05 kHz and uploads it
+3. YIN pitch detection extracts a per-frame pitch track
+4. The track is segmented into **notes** and turned into a key-invariant **interval contour**
+5. **Subsequence DTW** finds the song whose melody best contains the hummed fragment
+6. Result (plus top-k candidates) is returned to the user
 
 ## Tech
 
 - **Pitch detection**: YIN algorithm (from scratch)
-- **Matching**: Dynamic Time Warping (from scratch)
+- **Matching**: subsequence Dynamic Time Warping (from scratch) — a partial hum matches a full song
+- **Representation**: note-level semitone intervals (key- and tempo-invariant)
 - **Framework**: Frappe
 - **No ML, no external fingerprinting libraries**
 
@@ -22,13 +23,31 @@ Hum a song. We'll name it.
 
 | Module | Description |
 |--------|-------------|
-| Audio Capture | Records mic input via sounddevice |
-| YIN Pitch Detection | Extracts pitch sequence from audio |
-| Contour Normalization | Makes matching key-invariant |
-| DTW Matcher | Finds best matching song |
-| Song Indexer | Indexes songs into the database |
+| Audio Capture | Records mic input (browser Web Audio API / `sounddevice`) |
+| YIN Pitch Detection | Extracts a pitch track; lag search bounded to the vocal range |
+| Melody / Contour | Note segmentation + key-invariant interval contour |
+| Subsequence DTW Matcher | Matches a hummed fragment against full-length songs |
+| Pipeline | Framework-independent `audio → contour → match` (reused by API and benchmark) |
+| Song Indexer | Indexes songs into the database with the same pipeline |
 | API Layer | Frappe whitelisted REST endpoints |
 | Portal Page | Frontend UI for humming |
+
+## Accuracy & testing
+
+The recognition engine is fully testable **without a Frappe bench** — see
+[`benchmark/`](benchmark/README.md). A humming synthesizer generates queries
+with realistic distortions (key shift, tempo change, intonation drift,
+wrong/dropped notes, noise, partial fragments) and the harness reports Top-1 /
+Top-3 / MRR per distortion profile.
+
+```bash
+pip install -r requirements-dev.txt
+python -m unittest benchmark.test_standalone          # unit + end-to-end tests
+python -m benchmark.run_benchmark --queries 4          # built-in 25-song corpus
+python -m benchmark.run_benchmark --midi-dir mids/     # scale to any MIDI library
+```
+
+On the built-in corpus: **clean 100%**, **light 95%**, **realistic 71% Top-1 / 92% Top-3**.
 
 ## Installation
 
