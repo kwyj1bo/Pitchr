@@ -20,9 +20,30 @@ SAMPLE_RATE = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 
-# Subsequence-DTW cost (per query note) below which a match is accepted.
-# Calibrated against the synthetic benchmark; see benchmark/run_benchmark.py.
-DEFAULT_MATCH_THRESHOLD = 1.6
+# Accept decision. The absolute subsequence-DTW cost of the best candidate is a
+# weak signal on its own (many wrong songs score similarly), so acceptance also
+# requires a confidence MARGIN: the best candidate must beat the runner-up by at
+# least DEFAULT_MATCH_MARGIN. A true match stands out from the field; a hum with
+# no real match scores close to the whole pack. Both thresholds were calibrated
+# against the benchmark (see benchmark/run_benchmark.py --negatives).
+DEFAULT_MATCH_THRESHOLD = 1.0
+DEFAULT_MATCH_MARGIN = 0.3
+
+
+def decide_match(
+	ranked: list[tuple[str, float]],
+	threshold: float = DEFAULT_MATCH_THRESHOLD,
+	margin: float = DEFAULT_MATCH_MARGIN,
+) -> bool:
+	"""Accept the top candidate only if it is both close AND clearly ahead."""
+	if not ranked:
+		return False
+	best_score = ranked[0][1]
+	if best_score > threshold:
+		return False
+	if len(ranked) >= 2 and (ranked[1][1] - best_score) < margin:
+		return False
+	return True
 
 
 def extract_pitch_track(
@@ -53,6 +74,7 @@ def recognize_contour(
 	song_contours: list[tuple[str, np.ndarray]],
 	threshold: float = DEFAULT_MATCH_THRESHOLD,
 	top_k: int = 5,
+	margin: float = DEFAULT_MATCH_MARGIN,
 ) -> dict:
 	"""Match a query contour against a list of ``(name, contour)`` song fingerprints.
 
@@ -64,7 +86,7 @@ def recognize_contour(
 		return {"matched": False, "song_name": None, "score": None, "candidates": []}
 
 	best_name, best_score = ranked[0]
-	matched = best_score <= threshold
+	matched = decide_match(ranked, threshold, margin)
 	return {
 		"matched": matched,
 		"song_name": best_name if matched else None,
@@ -79,7 +101,8 @@ def recognize_audio(
 	sample_rate: int = SAMPLE_RATE,
 	threshold: float = DEFAULT_MATCH_THRESHOLD,
 	top_k: int = 5,
+	margin: float = DEFAULT_MATCH_MARGIN,
 ) -> dict:
 	"""End-to-end: raw audio -> recognition result."""
 	query_contour = audio_to_contour(audio, sample_rate)
-	return recognize_contour(query_contour, song_contours, threshold, top_k)
+	return recognize_contour(query_contour, song_contours, threshold, top_k, margin)

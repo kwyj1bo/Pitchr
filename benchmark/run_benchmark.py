@@ -21,7 +21,7 @@ import numpy as np
 
 from benchmark import synth
 from benchmark.corpus import builtin_corpus, load_midi_corpus
-from pitchr.pitch.pipeline import DEFAULT_MATCH_THRESHOLD, audio_to_contour
+from pitchr.pitch.pipeline import DEFAULT_MATCH_THRESHOLD, audio_to_contour, decide_match
 from pitchr.pitch.match import rank_matches
 
 
@@ -43,7 +43,7 @@ def evaluate_rejection(songs, profile, threshold=DEFAULT_MATCH_THRESHOLD, querie
 			audio = synth.synthesize(song.notes, profile, seed=1000 * q + 7)
 			ranked = rank_matches(audio_to_contour(audio), held_out)
 			total += 1
-			if ranked and ranked[0][1] <= threshold:
+			if decide_match(ranked, threshold):
 				false_accepts += 1
 	return false_accepts / total if total else 0.0
 
@@ -72,7 +72,7 @@ def evaluate(songs, profiles, queries_per_song=3, threshold=DEFAULT_MATCH_THRESH
 					rr_sum += 1.0 / (rank + 1)
 					if rank == 0:
 						top1 += 1
-						if ranked[0][1] <= threshold:
+						if decide_match(ranked, threshold):
 							accept_correct += 1
 					if rank < 3:
 						top3 += 1
